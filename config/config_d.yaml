@@ -1,0 +1,164 @@
+# Create config.yaml file to overwrite default settings
+
+# General settings
+loglevel: info
+
+# Redis settings
+redis_address: localhost
+
+local:
+
+# Environment information
+env:
+  name: SoulsGymIudex-v0
+  vectorize: False
+  kwargs:
+    game_speed: 1.
+  obs_shape: [74]
+  n_actions: 20
+  wrappers:
+    IudexObservationWrapper:
+      kwargs:
+
+max_env_steps: null
+
+# Algorithm choice
+algorithm: DQN
+
+# DQN parameters
+dqn:
+  batch_size: 64
+  train_epochs: 25
+  update_samples: 25
+  fill_buffer: False
+  min_samples: null
+  max_model_delay: 10
+
+  agent:
+    type: DQNAgent
+    kwargs:
+      lr: 0.001
+      gamma: 0.99
+      multistep: 4
+      grad_clip: 1.
+      q_clip: 2
+      device: cuda
+
+  network:
+    type: DQN
+    kwargs:
+      input_dims: 74
+      output_dims: 20
+      layer_dims: 128
+
+  replay_buffer:
+    type: ReplayBuffer
+    kwargs:
+      max_size: 100_000
+
+  observation_transform:
+    type: Normalize
+    kwargs:
+      keys:
+        - obs
+      shapes:
+        - [8]
+
+  value_transform:
+    type: Chain
+    kwargs:
+      transforms:
+        - type: Mask
+          kwargs:
+            key: __value__
+            mask_key: [info, action_mask]
+        - type: GreedyAction
+          kwargs:
+            value_key: __value__
+            action_key: action
+
+  action_transform:
+    type: Choice
+    kwargs:
+      key: action
+      probs: [0.9, 0.1]
+      transforms:
+        - type: Identity
+        - type: ReplaceWithNoise
+          kwargs:
+            key: action
+            noise:
+              type: MaskedDiscreteNoise
+              kwargs:
+                mask_key: [info, action_mask]
+                size_n: 20
+
+# Training node settings
+checkpoint:
+  save: False
+  epochs: 100  # Checkpoint every 100th iteration
+  save_buffer: False
+  load: False
+  load_buffer: False
+  load_config: False
+
+# Telemetry node settings
+telemetry:
+  update_interval: 5
+  moving_average: 20
+  transforms:
+    - type: MetricByKey
+      kwargs:
+        key: ep_reward
+        name: rewards
+    - type: MetricByKey
+      kwargs:
+        key: ep_steps
+        name: steps
+    - type: MetricByKey
+      kwargs:
+        key: total_steps
+        name: n_env_steps
+    - type: CompareValue
+      kwargs:
+        key: ep_reward
+        name: wins
+        value: 200
+        op: gt  # Greater than
+    - type: Timer
+  log_keys:
+    - rewards_av
+    - steps_av
+  callbacks:
+    - type: SaveBest
+      kwargs:
+        key: rewards_av
+        channel: save_best
+
+# Monitoring
+monitoring:
+  file_storage:
+    path: /home/SoulsAI/saves
+    plot:
+      xkey: n_env_steps
+      ykeys:
+        - rewards_av
+        - steps_av
+        - wins_av
+        - time
+  grafana: True
+  prometheus: True
+  wandb:
+    project: soulsai_iudex
+    entity: amacati
+    group: state_obs
+    save_dir: /home/SoulsAI/saves
+
+# Client settings
+max_episodes: -1  # -1 for infinite runs
+enable_interrupt: True
+step_delay: 0
+
+watchdog:
+  enable: False
+  minimum_samples: -1
