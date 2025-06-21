@@ -7,6 +7,7 @@ from stable_baselines3.common.monitor import Monitor
 from gymnasium import make as gym_make
 from soulsai.wrappers.iudex_wrappers import IudexObservationWrapper
 from stable_baselines3.common.callbacks import BaseCallback
+import uuid
 
 # Custom callback to stop after N episodes
 class StopAfterNEpisodesCallback(BaseCallback):
@@ -109,7 +110,7 @@ if os.path.exists(run_id_path):
     resume_mode = "allow"
     print(f"Resuming wandb run with ID: {wandb_run_id}")
 else:
-    wandb_run_id = wandb.util.generate_id()
+    wandb_run_id = str(uuid.uuid4())
     with open(run_id_path, 'w') as f:
         f.write(wandb_run_id)
     resume_mode = None
@@ -146,6 +147,9 @@ if os.path.exists(model_path + ".zip"):
         model.load_replay_buffer(replay_buffer_path)
 else:
     print("Starting new training run...")
+    # Get tensorboard log directory safely
+    tensorboard_log = wandb.run.dir if wandb.run and wandb.run.dir else None
+    
     model = DQN(
         "MlpPolicy",
         env,
@@ -153,7 +157,7 @@ else:
         gamma=gamma,
         batch_size=batch_size,
         verbose=1,
-        tensorboard_log=wandb.run.dir,
+        tensorboard_log=tensorboard_log,
     )
 
 # 8. Train the agent, stopping after max_episodes, logging boss HP, periodic checkpointing, and Enter key
@@ -175,9 +179,9 @@ model.learn(
 # 9. Save the model and replay buffer at the end
 model.save(model_path)
 model.save_replay_buffer(replay_buffer_path)
-wandb.save(model_path + ".zip", symlink=False)
-wandb.save(replay_buffer_path + ".pkl", symlink=False)
-wandb.save(checkpoint_model_path, symlink=False)
-wandb.save(checkpoint_replay_buffer_path, symlink=False)
+wandb.save(model_path + ".zip")
+wandb.save(replay_buffer_path + ".pkl")
+wandb.save(checkpoint_model_path)
+wandb.save(checkpoint_replay_buffer_path)
 
 print("Training complete. Model, replay buffer, and latest checkpoint saved for automatic resume.")
