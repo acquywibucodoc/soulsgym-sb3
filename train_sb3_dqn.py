@@ -140,7 +140,13 @@ gamma = dqn_params.get('agent', {}).get('kwargs', {}).get('gamma', 0.99)
 batch_size = dqn_params.get('batch_size', 64)
 
 # 7. Load model and replay buffer if they exist, else create new
-if os.path.exists(model_path + ".zip"):
+# Prioritize latest checkpoint over main checkpoint
+if os.path.exists(checkpoint_model_path):
+    print("Resuming from latest checkpoint...")
+    model = DQN.load(checkpoint_model_path, env=env)
+    if os.path.exists(checkpoint_replay_buffer_path):
+        model.load_replay_buffer(checkpoint_replay_buffer_path)
+elif os.path.exists(model_path + ".zip"):
     print("Resuming from saved model and replay buffer...")
     model = DQN.load(model_path, env=env)
     if os.path.exists(replay_buffer_path + ".pkl"):
